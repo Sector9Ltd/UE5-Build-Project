@@ -138,7 +138,7 @@ runs:
         $packageArg = if ($package -eq 'true') { "-package" } else { "" }
         $archiveArg = if ($archive -eq 'true') { "-archive -archivedirectory=`"$archivePath`"" } else { "" }
         $nullrhiArg = if ($nullrhi -eq 'true') { "-nullrhi" } else { "" }
-        $editorArg = if ($archive -eq 'true') { "-nocompileeditor" } else { "" }
+        $editorArg = if ($editor -ne 'true') { "-nocompileeditor" } else { "" }
         $encryptIniArg = if ($encryptIni -eq 'true') { "-encryptinifiles" } else { "" }
         $releaseArg = if ($release -ne 'false') { "-createreleaseversion=$release" } else { "" }
         $patchArg = if ($patch -ne 'false') { "-generatepatch -basedonreleaseversion=$patch" } else { "" }
@@ -153,6 +153,13 @@ runs:
         Write-Output "Executing command: $command"
 
         Invoke-Expression $command
+
+        # BuildCookRun reports failure only through its exit code. Without this the job goes green on a
+        # build that never produced anything, which is worse than having no CI at all.
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "RunUAT BuildCookRun failed with exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
+        }
 
         if ($deletePdb -eq 'true') {
           Get-ChildItem -Path "$uprojectDir\Saved\StagedBuilds\" -Recurse -Filter *.pdb | Remove-Item -Force

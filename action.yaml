@@ -1,6 +1,6 @@
 name: 'UE5-Build-Project'
 description: 'Cook, stage, and package projects for Unreal Engine'
-author: 'Orchid Isle Games'
+author: 'Sector 9, Ltd.'
 branding:
   icon: 'anchor'
   color: 'green'
@@ -71,7 +71,7 @@ inputs:
     required: false
     default: 'false'
   MAPS:
-    description: 'Maps to build and package (comma separated list of maps, leave empty for all maps)'
+    description: 'Maps to build and package (list of maps separated by commas or +, leave empty for all maps)'
     required: false
     default: 'true'
   DELETE_PDB:
@@ -112,7 +112,8 @@ runs:
         $encryptIni = "${{ inputs.ENCRYPT_INI }}"
         $release = "${{ inputs.RELEASE }}"
         $patch = "${{ inputs.PATCH }}"
-        $maps = "${{ inputs.MAPS }}"
+        # The cook splits map lists on +; accept commas too.
+        $maps = "${{ inputs.MAPS }}" -replace '\s*,\s*', '+'
         $deletePdb = "${{ inputs.DELETE_PDB }}"
         $anticheatEnabled = "${{ inputs.ANTICHEAT_ENABLED }}"
         $anticheatPrivateKey = "${{ inputs.ANTICHEAT_PRIVATE_KEY }}"

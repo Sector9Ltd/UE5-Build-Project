@@ -1,81 +1,80 @@
 # UE5-Build-Project
 
-This GitHub Action, "UE5-Build-Project," is tailored for automating the build processes of Unreal Engine projects. It efficiently handles tasks such as cooking, staging, packaging, creating .pak files, and even archiving projects, offering a robust solution for developers looking to streamline their workflow.
+Build, cook, stage, package and archive an Unreal project with RunUAT.
 
-## How it Works
+By [Sector 9](https://sector9.ltd). [Tool page](https://sector9.ltd/ue5-tools/build-project) | [Documentation](https://sector9.ltd/docs/ue5-tools/build-project/)
 
-The action leverages Unreal Engine's `RunUAT.bat` script, providing a flexible interface to configure various build aspects, including the ability to build, cook, stage, package, create .pak files, include a server, and archive the build output.
+## Requirements
+
+- A Windows runner. The step uses `shell: powershell`.
+- Unreal Engine installed on that runner, because the action calls the engine's `RunUAT.bat`. In practice that means a self-hosted runner.
+- Your project checked out on the runner, so `UPROJECT_PATH` points at a real `.uproject`.
+
+Find `RunUAT.bat` under `Engine\Build\BatchFiles` in your engine install.
+
+## Usage
+
+`RUNUAT_PATH`, `UPROJECT_PATH` and `PLATFORM` have no default and must be set. With only those, the action cooks and stages a Development build. It does not package or archive.
+
+```yaml
+jobs:
+  build:
+    runs-on: [self-hosted, Windows]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Sector9Ltd/UE5-Build-Project@0.3.1
+        with:
+          RUNUAT_PATH: C:\UE_5.8\Engine\Build\BatchFiles\RunUAT.bat
+          UPROJECT_PATH: ${{ github.workspace }}\MyProject\MyProject.uproject
+          PLATFORM: Win64
+```
+
+If RunUAT exits with a non-zero code, the step fails.
 
 ## Inputs
 
--   `RUNUAT_PATH`: Path to your `RunUAT.bat` file, typically in the `Engine/Build/BatchFiles` directory of your Unreal Engine installation.
--   `UPROJECT_PATH`: Full path to your Unreal Engine project `.uproject` file.
--   `BUILD_CONFIG`: Build configuration to use, e.g., `Development` or `Shipping`.
--   `PLATFORM`: Target platform for your build, such as `Win64` or `Linux`.
--   `CLEAN`: Set to `true` to have your project cleaned before rebuild (default: `false`).
--   `COOK`: Set to `true` to include cooking in the build process.
--   `STAGE`: Set to `true` to stage your project.
--   `PACKAGE`: Set to `true` to execute the packaging process.
--   `PAK`: Set to `true` to create .pak files.
--   `SERVER`: Set to `true` to include a dedicated server in your build.
--   `ARCHIVE`: Set to `true` to archive the build output.
--   `ARCHIVE_PATH`: Specify the path where the archive should be stored (used only if `ARCHIVE` is `true`).
--   `NULLRHI`: Set to `true` if you don't have a video output (i.e. a screen) such as when running this action in a container on the cloud (default: `false`).
--   `EDITOR` : Set to `true` to compile the editor as well. Useful for builds requiring editor functionality.
--   `ENCRYPT_INI`: Set to `true` to encrypt INI files.
--   `RELEASE`: Enter new release version number to create a release version.
--   `PATCH`: Enter the base release version number to generate a patch.
--   `MAPS`: Comma separated list of maps to build and package, leave empty to build all maps.
--   `DELETE_PDB`: Set to `true` to have any PDB files in the StagedBuilds directory purged (default: `false`).
--   `ANTICHEAT_ENABLED`: Set to `true` to enable anticheat functionality (default: `false`).
--   `ANTICHEAT_PRIVATE_KEY`: Base64 encoded private key for anticheat (required if `ANTICHEAT_ENABLED` is `true`).
--   `ANTICHEAT_PUBLIC_CERT`: Base64 encoded public certificate for anticheat (required if `ANTICHEAT_ENABLED` is `true`).
+Inputs are set under `with:`. The action compares each switch to the text `true`, so only `true` turns it on. Values are pasted into the script between double quotes, so do not put a `"` in one.
 
-## Using the Action
+| Name                    | Required | Default       | Description                                                                                                                                                                                                                             |
+| ----------------------- | -------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RUNUAT_PATH`           | Yes      | —             | Full path to `RunUAT.bat` in your engine install.                                                                                                                                                                                       |
+| `UPROJECT_PATH`         | Yes      | —             | Full path to the `.uproject` file. The action also uses its folder for the anticheat files and for `DELETE_PDB`.                                                                                                                        |
+| `BUILD_CONFIG`          | Yes      | `Development` | Build configuration, such as `Development` or `Shipping`. Passed as both `-clientconfig` and `-serverconfig`.                                                                                                                           |
+| `PLATFORM`              | Yes      | —             | Target platform, passed as `-platform`. With `SERVER: true` it is also the `-serverplatform`.                                                                                                                                           |
+| `CLEAN`                 | No       | `false`       | `true` adds `-clean`.                                                                                                                                                                                                                   |
+| `COOK`                  | No       | `true`        | `true` adds `-cook`.                                                                                                                                                                                                                    |
+| `STAGE`                 | No       | `true`        | `true` adds `-stage`.                                                                                                                                                                                                                   |
+| `PACKAGE`               | No       | `false`       | `true` adds `-package`.                                                                                                                                                                                                                 |
+| `PAK`                   | No       | `false`       | `true` adds `-pak`.                                                                                                                                                                                                                     |
+| `SERVER`                | No       | `false`       | `true` adds `-server -serverplatform=<PLATFORM> -noclient`. The `-noclient` flag means this run builds the dedicated server only, not the game client.                                                                                  |
+| `ARCHIVE`               | No       | `false`       | `true` adds `-archive` with `-archivedirectory` set to `ARCHIVE_PATH`.                                                                                                                                                                  |
+| `ARCHIVE_PATH`          | No       | —             | Folder to archive into. Read only when `ARCHIVE` is `true`; set it then, because the action passes it as given even when empty.                                                                                                         |
+| `NULLRHI`               | No       | `false`       | `true` adds `-nullrhi`, which runs without video output, for example on a machine with no display.                                                                                                                                      |
+| `EDITOR`                | No       | `true`        | Compile the editor as well. Any value other than `true` adds `-nocompileeditor`.                                                                                                                                                        |
+| `ENCRYPT_INI`           | No       | `false`       | `true` adds `-encryptinifiles`.                                                                                                                                                                                                         |
+| `RELEASE`               | No       | `false`       | A release version number. Any value other than `false` adds `-createreleaseversion=<value>`.                                                                                                                                            |
+| `PATCH`                 | No       | `false`       | The release version to base a patch on. Any value other than `false` adds `-generatepatch -basedonreleaseversion=<value>`.                                                                                                              |
+| `MAPS`                  | No       | `true`        | `true` builds all maps and passes no `-map` flag. A comma- or `+`-separated list of map names, such as `MapA,MapB`, builds only those maps; commas become `+`, the separator RunUAT reads. Passed as `-map=<list>`. See the note below. |
+| `DELETE_PDB`            | No       | `false`       | `true` deletes every `.pdb` under `Saved\StagedBuilds` in the project folder after a successful build.                                                                                                                                  |
+| `ANTICHEAT_ENABLED`     | No       | `false`       | `true` writes the two anticheat files before the build. See the note below.                                                                                                                                                             |
+| `ANTICHEAT_PRIVATE_KEY` | No       | —             | Base64-encoded private key. Written to `Build\NoRedist\base_private.key` in the project folder when `ANTICHEAT_ENABLED` is `true`. Pass it as a repository secret.                                                                      |
+| `ANTICHEAT_PUBLIC_CERT` | No       | —             | Base64-encoded public certificate. Written to `Build\NoRedist\base_public.cer` in the project folder when `ANTICHEAT_ENABLED` is `true`. Pass it as a repository secret.                                                                |
 
-Include this action in your workflow by adding it as a step in your `.github/workflows/main.yml` file:
+`MAPS`: the default `true` builds every map, so omit it to build all maps. A list of map names, separated by commas or `+`, builds only those maps; the action turns commas into `+`, the separator RunUAT reads.
 
-```yaml
-- name: Cook, Stage & Package UE Project
-  uses: OrchidIsle/UE5-Build-Project@latest
-  with:
-    RUNUAT_PATH: 'C:/Unreal Engine/UE5.3_Source/Engine/Build/BatchFiles/RunUAT.bat'
-    UPROJECT_PATH: ${{ github.workspace }}/YourGameFolder/MyGame.uproject
-    BUILD_CONFIG: Development
-    PLATFORM: Win64
-    CLEAN: true
-    COOK: true
-    STAGE: true
-    PACKAGE: false
-    PAK: false
-    SERVER: false
-    ARCHIVE: false
-    ARCHIVE_PATH: 'C:/Archives/MyGame'
-    NULLRHI: true
-    EDITOR: true
-    ENCRYPT_INI: true
-    RELEASE: '1.0.0'
-    PATCH: '0.9.0'
-    MAPS: 'Map1,Map2'
-    DELETE_PDB: true
-    ANTICHEAT_ENABLED: true
-    ANTICHEAT_PRIVATE_KEY: 'base64encodedprivatekey'
-    ANTICHEAT_PUBLIC_CERT: 'base64encodedpubliccert'
-```
+`ANTICHEAT_ENABLED: true` writes `Build\NoRedist\base_private.key` and `base_public.cer` in the project folder from the two Base64 inputs before the build. The keys are never put on the RunUAT command line. Pass them as `${{ secrets.NAME }}`.
 
 ## Outputs
 
-This action primarily executes build tasks and does not output variables. The success or failure of the build process can trigger subsequent workflow steps.
+None. The result is the step's pass or fail status and the files RunUAT produces.
 
-## Typical Usage
+## Other UE5 Tools
 
-Use this action to automate your Unreal Engine project's preparation for various environments, including development, testing, or production.
+- [UE5-Build-Plugin](https://github.com/Sector9Ltd/UE5-Build-Plugin): Build and package an Unreal plugin with RunUAT BuildPlugin.
+- [UE5-Semantic-Versioning](https://github.com/Sector9Ltd/UE5-Semantic-Versioning): Work out the version and build number from Git tags and the project or plugin version.
+- [UE5-EOS-Config](https://github.com/Sector9Ltd/UE5-EOS-Config): Write Epic Online Services settings into DefaultEngine.ini, with an optional dedicated-server config.
 
-## Additional Information
+## License
 
--   Ensure your Unreal Engine project is properly set up for the intended build configuration and platform.
--   Use the actions/checkout step before this action to clone your repository into the GitHub Actions runner.
--   Verify the accuracy and accessibility of paths provided to `RUNUAT_PATH` and `UPROJECT_PATH`.
--   Designed specifically for Unreal Engine projects; may not suit other project types or build systems.
-
-Integrating this GitHub Action into your CI/CD pipeline automates the preparation of your Unreal Engine project for distribution and testing, enhancing efficiency and reliability.
+See [LICENSE](LICENSE).
